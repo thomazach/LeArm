@@ -83,7 +83,7 @@ class LeArm:
         if debug:
             print("Opened HID device of LeArm.")
 
-    def servoMove(self, servos, angles, times=None, velocities=None):
+    def servoMove(self, servos, angles, time=None, velocities=None):
         '''
         Moves LeArm's servos based off of specified inputs. Updates the respective LSC_Series_Servo instances
         with both position, velocity, and termination time. 
@@ -96,10 +96,6 @@ class LeArm:
             Note: All lists must be the same length
         '''
 
-        # Make sure either a time or velocity has been specified.
-        if (times == None and velocities == None) or (times != None and velocities != None):
-            raise ValueError("Either a list of times or a list of angular velocities is needed to move the servos.")
-        
         # Convert degree angles into servo values
         servoAngles = []
         for i, servo in enumerate(servos):
@@ -112,52 +108,28 @@ class LeArm:
             if angle >= servo.limit[0] and angle <= servo.limit[1]:
                 pass
             else:
-                raise ValueError(f"The angle for servo {servo.servoID} is outside of its limits: {servo.limit}.")
+                raise ValueError(f"The angle for servo {servo.servoID} is {angle} which is outside of this servos limits: {servo.limit}.")
         
-        # If times were specified, calculate the velocities
-        if times != None:
-            velocities = []
-            for servo, angle, time in zip(servos, angles, times):
-                # Convert from servo position numbers to degrees
-                positionDegrees = servo.giveDegrees()
-                angularVelocity = (angle - positionDegrees) / (time / 1000)
-                velocities += [angularVelocity]
         
-        # If angular velocities were specified, convert them to times(ms) for the given angular change
-        elif velocities != None:
-            times = []
-            for angularVelocity, servo, angle in zip(velocities, servos, angles):
-                # Convert from servo position numbers to degrees
-                positionDegrees = servo.giveDegrees()
 
-                time = (angle - positionDegrees) / angularVelocity * 1000 # time until completion in ms
-                times += [time]
-
-        # Organize actions by execution times
-        duplicates = self.findDuplicates(times)
 
         # Assemble a hex packet for each time
-        paramLst = []
-        for uniqueTimes in duplicates.values():
-            numberServos = len(uniqueTimes)
-            timeHexList = self.convertIntToHighLowHex(times[uniqueTimes[0]])
+        numberServos = len(servos)
+        timeHexList = self.convertIntToHighLowHex(time)
 
-            params = [numberServos] + timeHexList
+        params = [numberServos] + timeHexList
 
-            for i in uniqueTimes:
-                params += self.generateServoSubParameter(servos[i].servoID, servoAngles[i])
+        for i, servo in enumerate(servos):
+            params += self.generateServoSubParameter(servo.servoID, servoAngles[i])
             
-            paramLst.append(params)
 
         # Update LSC_Series_Servo instances to have the correct information
         for i, servo in enumerate(servos):
             servo.position = servoAngles[i]
-            servo.angularVelocity = velocities[i]
-            servo.movingUntil = int(perf_counter() * 1000) + times[i]
-
-        # Send all packets
-        for param in paramLst:
-            self.send(self.CMD_SERVO_MOVE, param)
+            #servo.angularVelocity = velocities[i]
+            servo.movingUntil = int(perf_counter() * 1000) + time
+        
+        self.send(self.CMD_SERVO_MOVE, params)
 
     def generateServoSubParameter(self, servoID, angle):
         '''Generate the subparameters of the CMD_SERVO_MOVE hex command. This returns parameters 4, 5, 6 for a given servoID (int) and angle (in servo positional numbers)'''
@@ -166,10 +138,10 @@ class LeArm:
         return [servoID] + angleHexList
 
     def closeHand(self, time=None, velocity=None):
-        self.servoMove([self.servo1], [160], times=time, velocities=velocity)
+        self.servoMove([self.servo1], [160], time=time, velocities=velocity)
     
     def openHand(self, time=None, velocity=None):
-        self.servoMove([self.servo1], [0], times=time, velocities=velocity)
+        self.servoMove([self.servo1], [0], time=time, velocities=velocity)
 
     def servoUnload(self, servos):
         params = []
