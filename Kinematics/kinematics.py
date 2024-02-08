@@ -10,10 +10,9 @@ np.set_printoptions(precision=2, suppress=True)
 import numdifftools as nd
 #import matplotlib.pyplot as plt
 
-from matrix import matrix
+from Kinematics.matrix import matrix
 from mpl_toolkits.mplot3d import Axes3D
 
-import time
 
 def buildArm():
 
@@ -239,10 +238,66 @@ def motionPlan(linkVectors, jointAxis, jointAngles, endPos):
         motionPlanAngles.append(convertModelAnglesToServoAngles(jointAngles))
     
     return motionPlanAngles
-        
 
+def pointAtPositionInZYPlane(linkVectors, jointAxis, jointAngles, xDistanceToPlane, yPos, zPos, distanceFromPos=0.2, jointLimits=[(-90, 90), (-180, 0), (-90, 90), (-90, 90), (-90, 90)]):
+    ''' 
+        Function used to point a laser at a position in the ZY plane. This function generates a set of joint angles such that a laser attached
+        in line with last two links will display on a vertical ZY plane in world coordinates coresponding to xDistanceToPlane, yPos, zPos.
 
-          
+    '''
+    desiredEndVector = matrix([[xDistanceToPlane],[yPos],[zPos]])
+
+    # Function defining the map to position of the laser on the whiteboard (ZY plane)
+    def laserProjectionMap(jointAngles):
+         
+        # Force joint limits to be respected in the mapping
+        for i, jointLimit in enumerate(jointLimits):
+             
+            if min(jointLimit) > math.degrees(jointAngles[i]):
+                jointAngles[i] = math.radians(min(jointLimit))
+            elif max(jointLimit) < math.degrees(jointAngles[i]):
+                jointAngles[i] = math.radians(max(jointLimit))
+
+        endLinks = getPosition(linkVectors, jointAxis, jointAngles)
+
+        # Get the laser unit vector
+        laserVector = endLinks[-1] - endLinks[-2]
+        laserUnitVector = matrix(laserVector.mat/np.linalg.norm(laserVector.mat))
+
+        # Find the distance between the ZY plane and the end effector in the x component
+        distanceFromPlane = xDistanceToPlane - endLinks[-1].mat[0][0]
+
+        # Find the scaling coefficient that makes the x component of the laserUnitVector equal to the distanceFromPlane
+        scalingConstant = distanceFromPlane/laserUnitVector.mat[0][0]
+
+        # Create the final laserVector value, which is the unit vector scaled by the scaling constant found above
+        laserVector = scalingConstant * laserUnitVector
+
+        # Find the laserEndPoint, which is the laserVector + the end position of the arm
+        laserEndPoint = endLinks[-1] + laserVector
+
+        # Create a final output whos value is the magnitude of the difference between the laser's end point and its desired endpoint
+        diff = laserEndPoint - desiredEndVector
+        absDifference = diff.norm()
+        return absDifference
+    
+    laserProjectionMapGradient = nd.Gradient(laserProjectionMap)
+
+    zeroVector = laserProjectionMap(jointAngles)
+    while zeroVector > distanceFromPos:
+        gradient = laserProjectionMapGradient(jointAngles)
+        negativeGradient = gradient * -1
+
+        tempJointAngles = []
+        for jointAngle, gradientParameter in zip(jointAngles, negativeGradient):
+            tempJointAngles += [jointAngle + (gradientParameter + random.uniform(0, 0.0001)) * (0.05 + random.uniform(0, 0.001))] # Random numbers are to escape saddle points, and proportionally symetric geometry
+        jointAngles = tempJointAngles
+
+        zeroVector = laserProjectionMap(jointAngles)
+        print(zeroVector)
+
+    return jointAngles
+
      
 # linkVectors, jointAxis, jointAngles = buildArm()
 # print("Joint angles in the start position: ", jointAngles)
