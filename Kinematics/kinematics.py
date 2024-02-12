@@ -115,11 +115,13 @@ def rotateVectors(vectors, rotationMatrices):
     Output:
         rotatedVectors: List of matrix objects representing rotated vectors.
     '''
+    print("vectors:   ", vectors)
+    print("rotationmatrices:  \n", rotationMatrices)
     rotatedVectors = []
     for i, vector in enumerate(vectors):
         rotatedVectors.append(rotationMatrices[i] * vector)
     
-        return rotatedVectors
+    return rotatedVectors
 
 def vectorSetCumulativeSum(vectors):
     '''Compute cumulative sum of vectors.
@@ -178,6 +180,7 @@ def getPosition(linkVectors, jointAxis, jointAngles, graph=False, useRigidBodies
     vectorsGlobalRotation = rotateVectors(linkVectors, rotationSetCumulative) # Rotate individual vectors to the global frame
     vectorsGlobalFrame = vectorSetCumulativeSum(vectorsGlobalRotation) # Add vectors together so that they each end at the end of their respective link
 
+
     return vectorsGlobalFrame
 
 def threeDJointAxisSet(jointAxis):
@@ -221,7 +224,7 @@ def armJacobian(linkVectors, jointAxis, jointAngles, linkNumber):
     '''
 
     linkEnds = getPosition(linkVectors, jointAxis, jointAngles)
-
+    
     vDiff = vectorSetDifference(linkEnds[linkNumber], [matrix([[0], [0], [0]])] + linkEnds)
 
     jointAxisVectors = threeDJointAxisSet(jointAxis)
@@ -558,7 +561,7 @@ def laserMotionPlan(linkVectors, jointAxis, jointAngles, desiredY, desiredZ, xDi
     Output:
         motionPlanAngles: List of servo joint angles representing the motion plan.
     '''
-    
+
     startingLaserEndPoint = laserProjectionMap(linkVectors, jointAxis, jointAngles)
 
     y = np.linspace(startingLaserEndPoint.mat[1][0], desiredY, 10)
