@@ -10,6 +10,10 @@ class matrix:
 			return np.linalg.norm(self.mat)
 		else:
 			raise ValueError("Tried to take the norm of a matrix. (need a vector)")
+	
+	def cross(self, other):
+		if isinstance(self, matrix) & isinstance(other, matrix):
+			return matrix(np.cross(self.mat, other.mat))
 
 	def __add__ (self, other):
 		if isinstance(self, matrix) & isinstance(other, matrix):
