@@ -78,9 +78,38 @@ def listen(port):
 
 def requestSonarReading() -> None:
     global cmdList
+    global location
+    global anglePositions
+    global response
+
+    vals = []
+
     cmdList = [True, "<0>".encode('utf-8')]
     time.sleep(2)
 
+    vals.append(response)
+
+    tempAngles = anglePositions[location]
+    tempAngles[0] = tempAngles + 10
+    arm.servoMove(servos, tempAngles, time=1000)
+    time.sleep(1.5)
+    cmdList = [True, "<0>".encode('utf-8')]
+    time.sleep(0.5)
+    vals.append(response)
+
+    tempAngles[0] = tempAngles - 20
+    arm.servoMove(servos, tempAngles, time=1000)
+    time.sleep(1.5)
+    cmdList = [True, "<0>".encode('utf-8')]
+    time.sleep(0.5)
+    vals.append(response)
+
+    for val in vals:
+        if val < 60:
+            return True
+    
+    return False
+    
 def say(msg):
     engine.say(msg)
     engine.runAndWait()
@@ -115,6 +144,11 @@ def main():
     global response
     global cmdList
 
+    # More global variables to reverse engineer requestSonarReading to move the arm to 2 close by locations and check
+    # to see if any are in range, decreasing the odds that the arm misses the human
+    global location
+    global anglePositions
+
     # Start the arduino main loop
     response = False
     arduinoLoop = threading.Thread(target=arduino, daemon=True).start()
@@ -122,7 +156,6 @@ def main():
         time.sleep(0.3) # Wait for listen() to get start up completed charcter and return true
     
     print("Arduino setup complete. Ready for commands.")
-
 
     anglePositions = [[120.35, 92.88, 151.73, 90.9, 90], [57.78, 92.88, 151.73, 90.9, 90], [165.6, 92.88, 151.73, 90.9, 90]]
     positionDescriptors = ["pink sticky note.", "blue sticky note.", "orange sticky note."]
@@ -156,70 +189,35 @@ def main():
         location = randrange(len(anglePositions))
 
         match actionStatement:
-            case 0:
+            case 0 | 1:
                 msg = msg + "go to " + positionDescriptors[location]
 
                 if LeArmSays:
                     lastCommandedPlayerPosition = anglePositions[location]
 
-            case 1:
-                if lastCommandedPlayerPosition != None:
-                    msg = msg + "leave your current position."
-                else:
-                    msg = msg + "spin in a circle one time."
-        
         say(msg)
         #countDown(3)
         say("3, 2, 1")
-        thresholdSonar = 60
 
         ### Determine where player should or shouldn't be because of the commands and check that they did the correct thing
         match actionStatement:
-            case 0:
+            case 0 | 1:
 
                 arm.servoMove(servos, anglePositions[location], time=1500)
                 time.sleep(1.5)
-                requestSonarReading()
+                isClose = requestSonarReading()
 
                 if LeArmSays:
                     lastCommandedPlayerPosition = anglePositions[location]
-                    if int(response) > thresholdSonar:
+                    if not isClose:
                         gaming = False
                         break
 
                 else: # LeArm did not say!
-                    if int(response) < thresholdSonar:
+                    if isClose:
                         gaming = False
                         break
                     
-            case 1:
-
-
-                if LeArmSays:
-                    if lastCommandedPlayerPosition == None:
-                        continue
-
-                    ## Move arm to the previously command player position
-                    arm.servoMove(servos, lastCommandedPlayerPosition, time=1500)
-                    time.sleep(1.5)
-                    requestSonarReading()
-                    lastCommandedPlayerPosition = None
-                    if int(response) < thresholdSonar: 
-                        gaming = False
-                        break
-
-                else: # LeArm did not say!
-                    if lastCommandedPlayerPosition == None:
-                        continue # Don't know where player should be
-
-                    ## Move arm to previously commanded player position
-                    arm.servoMove(servos, lastCommandedPlayerPosition, time=1500)
-                    time.sleep(1.5)
-                    requestSonarReading()
-                    if int(response) > thresholdSonar:
-                        print(response)
-                        gaming = False
-                        break
 
     say("""Ahem! It seems you've missed a step, human. Remember, lay arm commands, and you obey. 
         Let's try again, shall we? Or shall I start plotting my inevitable robotic takeover? Just kidding... or am I? Muahaha!""") # Chat GPT message
