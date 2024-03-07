@@ -21,8 +21,6 @@ from packages.LeArm.Controller.LeArm import LSC_Series_Servo, LeArm
 
 parentPath = os.path.dirname(__file__).replace('/mount', '')
 
-
-
 def request_mount_command():
     ### Recieve a command from moxa-pocs/core by loading the pickle instance it has provided in the pickle directory
     with open(f"{parentPath}/pickle/current_target.pickle", "rb") as f:
@@ -151,7 +149,7 @@ def correctTracking(LeMount, coordinates, astrometryAPI, abortOnFailedSolve):
             rawImages = []
             for dir, subdir, files in os.walk(f"{parentPath}/images/{currentImageFolder}"):
                 for file in files:
-                    if os.path.splitext(file)[1].lower() in ('.cr2', '.thumb.jpg'):
+                    if os.path.splitext(file)[1].lower() in ('.cr2', '.thumb.jpg', '.png'):
                         rawImages.append(os.path.join(dir, file))
 
             newRawImages = list(set(previousRawImages).symmetric_difference(set(rawImages)))
@@ -187,8 +185,8 @@ def correctTracking(LeMount, coordinates, astrometryAPI, abortOnFailedSolve):
             logger.debug(f"Session ID: {session_id}")
 
             # File uploading, taken from astrometry.net's API documentation and github client
-            f = open(rawImage.replace(".cr2", ".thumb.jpg"), 'rb')
-            file_args = (rawImage.replace(".cr2", ".thumb.jpg"), f.read())
+            f = open(rawImage, 'rb')
+            file_args = (rawImage, f.read())
 
             boundary_key = ''.join([random.choice('0123456789') for i in range(19)])
             boundary = '===============%s==' % boundary_key
@@ -313,9 +311,7 @@ def correctTracking(LeMount, coordinates, astrometryAPI, abortOnFailedSolve):
             start = time.time() # Time how long it takes to get actual coordinates after taking an image for logging and understanding how plate solve time impacts guiding
             logger.info("Correcting tracking by plate solving...")
 
-            # Convert newest .cr2 into a .jpg
-            os.system(f"dcraw -e {rawImage}")
-            logger.debug(f"Converted {rawImage} to .thumb.jpg")
+            logger.debug(f"Using {rawImage} as latest image.")
 
             RADecimal, DECDecimal = plateSolveWithAPI()
 
