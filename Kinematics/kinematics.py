@@ -1,4 +1,3 @@
-
 import os
 import math
 import yaml
@@ -298,7 +297,6 @@ def goToPos(linkVectors, jointAxis, jointAngles, desiredEndPos):
         desiredEndPos = matrix(desiredEndPos)
 
     seperationVector = desiredEndPos - getPosition(linkVectors, jointAxis, jointAngles)[-1]
-    print(seperationVector)
 
     def goToEndPoint(t):
         if isinstance(t, np.ndarray):
